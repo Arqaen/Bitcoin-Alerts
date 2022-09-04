@@ -19,73 +19,109 @@ db = TinyDB(dbname)
 updater = Updater(token)
 dp = updater.dispatcher
 
+statusRemove = False
+statusPassword = False
+statusAbove = False
+statusBelow = False
+
 def empty(update: Update, context: CallbackContext) -> None:
-    return update.message.text
+
+    if statusRemove == True:
+        removeit(update, context, update.message.text)
+
+    if statusPassword == True:
+        addwhiltelist(update, context, update.message.text)
+
+    if statusAbove == True:
+        above(update, context, update.message.text)
+
+    if statusBelow == True:
+        below(update, context, update.message.text)
+    
+def stop(update: Update, context: CallbackContext) -> None:
+    global statusRemove, statusPassword, statusAbove, statusBelow
+    if statusRemove == True or statusPassword == True or statusAbove == True or statusBelow == True:
+        statusRemove = False
+        statusPassword = False
+        statusAbove = False
+        statusBelow = False
+        update.message.reply_text("Action stopped")
+    else:
+        update.message.reply_text("No action to stop")
 
 def remove(update: Update, context: CallbackContext) -> None:
+    global statusRemove
+    statusRemove = True
     update.message.reply_text("Please send me the price of the alert you want to remove")
-    dp.add_handler(MessageHandler(Filters.text, removeit))
 
-def removeit(update: Update, context: CallbackContext) -> None:
+def removeit(update: Update, context: CallbackContext, response=None) -> None:
+    global statusRemove
 
-    status = False
-    if update.message.text.isdigit():
-        with open(f'{dbname}', 'r') as f:
-            try:
-                data = json.load(f)
-                data = data["_default"]
-            except:
-                pass
+    if statusRemove == True and response != None:
 
-        for i in data:
-            i = str(i)
-            if str(data[i]['id']) == str(update.message.chat_id):
-                tabla = Query()
-                temp = db.get(tabla.id == str(update.message.chat_id))
-                for x in data[i]['btc']['above']:
-                    if str(data[i]['btc']['above'][x]) == str(update.message.text):
-                        status = True
-                        temp["btc"]["above"].pop(x)
-                        
-                for w in data[i]['btc']['below']:
-                    if str(data[i]['btc']['below'][w]) == str(update.message.text):
-                        status = True
-                        temp["btc"]["below"].pop(w)
+        status = False
+        if response.isdigit():
 
-        if status == True:
-            db.update(temp, tabla.id == str(update.message.chat_id))
-            update.message.reply_text("Alert removed")          
+            with open(f'{dbname}', 'r') as f:
+                try:
+                    data = json.load(f)
+                    data = data["_default"]
+                except:
+                    pass
 
-        if status == False:
-            update.message.reply_text("Alert not found")
+            for i in data:
+                i = str(i)
+                if str(data[i]['id']) == str(update.message.chat_id):
+                    tabla = Query()
+                    temp = db.get(tabla.id == str(update.message.chat_id))
+                    for x in data[i]['btc']['above']:
+                        if str(data[i]['btc']['above'][x]) == str(response):
+                            status = True
+                            temp["btc"]["above"].pop(x)
+                            
+                    for w in data[i]['btc']['below']:
+                        if str(data[i]['btc']['below'][w]) == str(response):
+                            status = True
+                            temp["btc"]["below"].pop(w)
+
+            if status == True:
+                db.update(temp, tabla.id == str(update.message.chat_id))
+                update.message.reply_text("Alert removed")          
+
+            if status == False:
+                update.message.reply_text("Alert not found")
+            
+        else:
+            update.message.reply_text("Please send me a number")
         
-    else:
-        update.message.reply_text("Please send me a number")
-
-    dp.remove_handler(MessageHandler(Filters.text, below))
-    return update.message.text
-
+        statusRemove = False
+    
 def btc(update: Update, context: CallbackContext) -> None:
     price = getPrice()
     update.message.reply_text(f"The price of bitcoin is {price}")
     
-def addwhiltelist(update: Update, context: CallbackContext) -> None:
-    if update.message.text == pw:
-        print("Password correct")
-        db.insert({"id":f"{update.message.chat_id}","btc":{"above":{},"below":{}}})
-        
-    dp.remove_handler(MessageHandler(Filters.text, below))
-    return update.message.text
-   
+def addwhiltelist(update: Update, context: CallbackContext, response=None) -> None:
+    global statusPassword
+    if checkWhitelist(update.message.chat_id) == True:
+        update.message.reply_text("You are already whitelisted")
+    else:
+        if statusPassword == True and response != None:
+            if response == pw:
+                update.message.reply_text("Password correct, you are now in the whitelist")
+                db.insert({"id":f"{update.message.chat_id}","btc":{"above":{},"below":{}}})
+    statusPassword = False
+
 def password(update: Update, context: CallbackContext) -> None:
+    global statusPassword
+    statusPassword = True
     update.message.reply_text("Please send me the password")
-    dp.add_handler(MessageHandler(Filters.text, addwhiltelist))
- 
+
 def start(update: Update, context: CallbackContext) -> None:
     update.message.reply_text("Hello, I'm a bot that will alert you when the price of bitcoin is higher or lower than the value you set. To start, type /help")
-      
+    statusPassword = False
+
 def help(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text("The commands are: \n\n\n/help - To see the list of commands \n\n/start - Start the bot \n\n/btc - Get the price of btc\n\n/alert - Create a new alert\n\n/active - Check the active alerts\n\n/remove - Remove some alert\n")
+    update.message.reply_text("The commands are: \n\n\n/help - To see the list of commands \n\n/start - Start the bot \n\n/price - Get the price of btc\n\n/alert - Create a new alert\n\n/active - Check the active alerts\n\n/remove - Remove some alert\n\n")
 
 def alert(update: Update, context: CallbackContext) -> None:
 
@@ -105,78 +141,82 @@ def button(update: Update, context: CallbackContext) -> None:
     query.answer()
     query.edit_message_text(text="Please send me the price you want to set the alert")
 
+    global statusAbove, statusBelow
     if str(query.data) == '1':
-        dp.add_handler(MessageHandler(Filters.text, above))
+        statusAbove = True
     elif str(query.data) == '2':
-        dp.add_handler(MessageHandler(Filters.text, below))
+        statusBelow = True
 
-def above(update: Update, context: CallbackContext) -> None:
+def above(update: Update, context: CallbackContext, response=None) -> None:
     
-    if update.message.text.isdigit():
+    global statusAbove
+    if statusAbove == True and response != None:
 
-        price = getPrice()
-        if int(update.message.text) < price:
-            update.message.reply_text(f"The price is already higher than the value you set (Btc: {price})")
+        if response.isdigit():
 
-        else:
-            print(update.message.text)
-            tabla = Query()
-            key = getKey('above', update.message.chat_id,update.message.text) 
-            if key == -1:
-                update.message.reply_text("The alert is already in the list")
+            price = getPrice()
+            if int(response) < price:
+                update.message.reply_text(f"The price is already higher than the value you set (Btc: {price})")
 
-            if key != None:
-                key = key + 1
-            if key == None:
-                update.message.reply_text(f"You are not in the whitelist, please contact an admin")
+            else:
+                print(response)
+                tabla = Query()
+                key = getKey('above', update.message.chat_id,response) 
+                print(key)
+                if key == -1:
+                    update.message.reply_text("The alert is already in the list")
 
-            if key:
+                if key != None:
+                    key = key + 1
+                if key == None:
+                    update.message.reply_text(f"You are not in the whitelist, please contact an admin")
 
-                temp = db.get(tabla.id == str(update.message.chat_id))
-                temp["btc"]["above"][str(key)] = update.message.text
-                db.update(temp, tabla.id == str(update.message.chat_id))
+                if key:
 
-                update.message.reply_text(f"Ok, I will alert you when the price of bitcoin is higher than {update.message.text}")
-   
-    else:
-        update.message.reply_text("Please send me a number")
+                    temp = db.get(tabla.id == str(update.message.chat_id))
+                    temp["btc"]["above"][str(key)] = response
+                    db.update(temp, tabla.id == str(update.message.chat_id))
 
-    dp.remove_handler(MessageHandler(Filters.text, above))
-    return update.message.text
-
-def below(update: Update, context: CallbackContext) -> None:
+                    update.message.reply_text(f"Ok, I will alert you when the price of bitcoin is higher than {response}")
     
-    if update.message.text.isdigit():
-
-        price = getPrice()
-        if int(update.message.text) > price:
-            update.message.reply_text(f"The price is already lower than the value you set (Btc: {price})")
-
         else:
-            print(update.message.text)
-            tabla = Query()
-            key = getKey('below', update.message.chat_id,update.message.text) 
-            if key == -1:
-                update.message.reply_text("The alert is already in the list")
+            update.message.reply_text("Please send me a number")
+    statusAbove = False
 
-            if key != None:
-                key = key + 1
-            if key == None:
-                update.message.reply_text(f"You are not in the whitelist, please contact an admin")
+def below(update: Update, context: CallbackContext, response=None) -> None:
+    
+    global statusBelow
+    if statusBelow == True and response != None:
 
-            if key:
+        if response.isdigit():
 
-                temp = db.get(tabla.id == str(update.message.chat_id))
-                temp["btc"]["below"][str(key)] = update.message.text
-                db.update(temp, tabla.id == str(update.message.chat_id))
+            price = getPrice()
+            if int(response) > price:
+                update.message.reply_text(f"The price is already lower than the value you set (Btc: {price})")
 
-                update.message.reply_text(f"Ok, I will alert you when the price of bitcoin is lower than {update.message.text}")
-   
-    else:
-        update.message.reply_text("Please send me a number")
+            else:
+                print(response)
+                tabla = Query()
+                key = getKey('below', update.message.chat_id,response) 
+                if key == -1:
+                    update.message.reply_text("The alert is already in the list")
 
-    dp.remove_handler(MessageHandler(Filters.text, below))
-    return update.message.text
+                if key != None:
+                    key = key + 1
+                if key == None:
+                    update.message.reply_text(f"You are not in the whitelist, please contact an admin")
+
+                if key:
+
+                    temp = db.get(tabla.id == str(update.message.chat_id))
+                    temp["btc"]["below"][str(key)] = response
+                    db.update(temp, tabla.id == str(update.message.chat_id))
+
+                    update.message.reply_text(f"Ok, I will alert you when the price of bitcoin is lower than {response}")
+    
+        else:
+            update.message.reply_text("Please send me a number")
+    statusBelow = False
 
 def active(update: Update, context: CallbackContext) -> None:
     with open(f'{dbname}', 'r') as f:
@@ -188,21 +228,26 @@ def active(update: Update, context: CallbackContext) -> None:
 
     for i in data:
         i = str(i)
+        empt = True
         if str(data[i]['id']) == str(update.message.chat_id):
             activeAlerts = data[i]['btc']
             text = "Active alerts: \n\nAbove of: \n"
 
-            for x in data[i]['btc']['above']:
-                text = text + f"- {data[i]['btc']['above'][x]} \n"
-                    
-        
-            text = text + "\nBelow of: \n"
-            for w in data[i]['btc']['below']:
-                text = text + f"- {data[i]['btc']['below'][w]} \n"
-            update.message.reply_text(text)
+            if len(data[i]['btc']['above']) > 0 or len(data[i]['btc']['below']) > 0:
+                empt = False
 
-        else:
-            update.message.reply_text("You don't have any active alerts")
+            if empt == False:
+
+                for x in data[i]['btc']['above']:
+                    text = text + f"{data[i]['btc']['above'][x]} \n"
+                        
+                text = text + "\nBelow of: \n"
+                for w in data[i]['btc']['below']:
+                    text = text + f"{data[i]['btc']['below'][w]} \n"
+                update.message.reply_text(text)
+
+            else:
+                update.message.reply_text("You don't have any active alerts")
  
 def getKey(type, id, text):
 
@@ -234,15 +279,33 @@ def getPrice():
     except:
         pass 
 
+def checkWhitelist(id):
+    with open(f'{dbname}', 'r') as f:
+        try:
+            data = json.load(f)
+            data = data["_default"]
+        except:
+            pass
+
+    for i in data:
+        i = str(i)
+        if str(data[i]['id']) == str(id):
+            return True
+    return False
+
 def main() -> None:
 
     updater.dispatcher.add_handler(CommandHandler('start', start))
-    updater.dispatcher.add_handler(CommandHandler('btc', btc))
+    updater.dispatcher.add_handler(CommandHandler('price', btc))
     updater.dispatcher.add_handler(CommandHandler('active', active))
     updater.dispatcher.add_handler(CommandHandler('help', help))
+    updater.dispatcher.add_handler(CommandHandler('stop', stop))
+
     updater.dispatcher.add_handler(CommandHandler('alert', alert))
     updater.dispatcher.add_handler(CommandHandler('password', password))
     updater.dispatcher.add_handler(CommandHandler('remove', remove))
+
+    updater.dispatcher.add_handler(MessageHandler(Filters.text, empty))
     updater.dispatcher.add_handler(CallbackQueryHandler(button))
     updater.start_polling()
     updater.idle()
