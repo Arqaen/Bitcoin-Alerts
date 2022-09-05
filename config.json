@@ -1,0 +1,6 @@
+{
+    "db": "db.json",
+    "password": "password",
+    "token": "token", 
+    "sleep": 0
+}

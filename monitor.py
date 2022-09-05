@@ -1,4 +1,3 @@
-from tinydb import TinyDB, Query
 from telegram import Bot as TBot
 import requests
 import time
@@ -28,7 +27,7 @@ sleep = config['sleep']
 Tbot = TBot(token)
 
 while True:
-    
+
     price=getPrice() 
     print(f"\n\nBitcoin price:{price}")
     print("----------------------\n")
