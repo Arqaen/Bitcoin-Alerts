@@ -67,7 +67,7 @@ while True:
                     json.dump(original, f, indent=4)
                 break
 
-        time.sleep(5)
+        time.sleep(1)
 
     time.sleep(sleep)
 

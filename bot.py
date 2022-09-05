@@ -4,7 +4,6 @@ import requests
 import json
 from tinydb import TinyDB, Query
 
-
 with open('config.json', 'r') as f:
     try:
         config = json.load(f)
@@ -23,6 +22,9 @@ statusRemove = False
 statusPassword = False
 statusAbove = False
 statusBelow = False
+
+def getId(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text(f"Your id is {update.message.chat_id}")
 
 def empty(update: Update, context: CallbackContext) -> None:
     print(update.message.text)
@@ -127,7 +129,7 @@ def start(update: Update, context: CallbackContext) -> None:
     statusPassword = False
 
 def help(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text("The commands are: \n\n\n/help - To see the list of commands \n\n/start - Start the bot \n\n/price - Get the price of btc\n\n/alert - Create a new alert\n\n/active - Check the active alerts\n\n/remove - Remove some alert\n\n")
+    update.message.reply_text("The commands are: \n\n\n/help - To see the list of commands \n\n/start - Start the bot \n\n/price - Get the price of bitcoin\n\n/alert - Create a new alert\n\n/active - Check the active alerts\n\n/remove - Remove some alert\n\n/id - Get the id of the chat")
 
 def alert(update: Update, context: CallbackContext) -> None:
 
@@ -308,6 +310,7 @@ def main() -> None:
     updater.dispatcher.add_handler(CommandHandler('active', active))
     updater.dispatcher.add_handler(CommandHandler('help', help))
     updater.dispatcher.add_handler(CommandHandler('stop', stop))
+    updater.dispatcher.add_handler(CommandHandler('id', getId))
 
     updater.dispatcher.add_handler(CommandHandler('alert', alert))
     updater.dispatcher.add_handler(CommandHandler('password', password))
