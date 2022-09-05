@@ -1,8 +1,9 @@
+from tinydb import TinyDB, Query
 from telegram import Bot as TBot
 import requests
-import random
 import time
 import json
+
 
 def getPrice():
     url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
@@ -13,19 +14,62 @@ def getPrice():
         return int(float(price))
     except:
         pass
+
+try:  
+    with open('config.json') as f:
+        config = json.load(f)
+except:
+    print("Error loading config.json")
+    exit()
+
+token = config['token']
+dbname = config['db']
+sleep = config['sleep']
+Tbot = TBot(token)
+
+while True:
     
-price=getPrice()
-Tbot = TBot('5055999648:AAFbbe6lWYAiS3Juxmk2d713h-oaW1ME0VY')
-chat = "-1001671121948"
+    price=getPrice() 
+    print(f"\n\nBitcoin price:{price}")
+    print("----------------------\n")
+    try:
+        with open(f'{dbname}', 'r') as f:        
+            data = json.load(f)
+            original = data
+            data = data["_default"]
+    except:
+        print("Error loading data")
+        time.sleep(sleep)
+        continue
 
-if(price):
-    if(price >= up):
-        cap=f"Bitcoin price is above of {up} the actual price is {price}"
+    for i in data:
+        chat = data[i]['id']
+        print(f"\nId: {chat}\n")
 
-    elif(price <= down):
-        cap=f"Bitcoin price is below of {down} the actual price is {price}"
+        for d in data[i]['btc']["above"]:
+            alert = data[i]['btc']["above"][d]
+            alert = int(alert)
+            print(alert)
+            if price > alert:
+                Tbot.send_message(chat, f'Bitcoin price is above of {alert} the actual price is {price}')
+                del original["_default"][i]['btc']["above"][d]
+                with open(f'{dbname}', 'w') as f:
+                    json.dump(original, f, indent=4)
+                break
 
-    Tbot.send_message(chat,text=cap)
+        for d in data[i]['btc']["below"]:
+            alert = data[i]['btc']["below"][d]
+            alert = int(alert)
+            print(alert)
+            if price < alert:
+                Tbot.send_message(chat, f'Bitcoin price is below of {alert} the actual price is {price}')
+                del original["_default"][i]['btc']["below"][d]
+                with open(f'{dbname}', 'w') as f:
+                    json.dump(original, f, indent=4)
+                break
 
+        time.sleep(5)
+
+    time.sleep(sleep)
 
 

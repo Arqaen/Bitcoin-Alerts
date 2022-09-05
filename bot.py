@@ -1,9 +1,9 @@
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler, CallbackContext, DispatcherHandlerStop, ConversationHandler
-from telegram import BotCommandScopeAllPrivateChats, InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler, CallbackContext
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 import requests
 import json
-from tinydb import table, TinyDB, Query
-from tinydb.operations import add
+from tinydb import TinyDB, Query
+
 
 with open('config.json', 'r') as f:
     try:
@@ -25,7 +25,7 @@ statusAbove = False
 statusBelow = False
 
 def empty(update: Update, context: CallbackContext) -> None:
-
+    print(update.message.text)
     if statusRemove == True:
         removeit(update, context, update.message.text)
 
@@ -62,35 +62,39 @@ def removeit(update: Update, context: CallbackContext, response=None) -> None:
         status = False
         if response.isdigit():
 
-            with open(f'{dbname}', 'r') as f:
-                try:
-                    data = json.load(f)
-                    data = data["_default"]
-                except:
-                    pass
+            try:
+                with open(f'{dbname}', 'r') as f:
+                    try:
+                        data = json.load(f)
+                        data = data["_default"]
+                    except:
+                        pass
 
-            for i in data:
-                i = str(i)
-                if str(data[i]['id']) == str(update.message.chat_id):
-                    tabla = Query()
-                    temp = db.get(tabla.id == str(update.message.chat_id))
-                    for x in data[i]['btc']['above']:
-                        if str(data[i]['btc']['above'][x]) == str(response):
-                            status = True
-                            temp["btc"]["above"].pop(x)
-                            
-                    for w in data[i]['btc']['below']:
-                        if str(data[i]['btc']['below'][w]) == str(response):
-                            status = True
-                            temp["btc"]["below"].pop(w)
+                for i in data:
+                    i = str(i)
+                    if str(data[i]['id']) == str(update.message.chat_id):
+                        tabla = Query()
+                        temp = db.get(tabla.id == str(update.message.chat_id))
+                        for x in data[i]['btc']['above']:
+                            if str(data[i]['btc']['above'][x]) == str(response):
+                                status = True
+                                temp["btc"]["above"].pop(x)
+                                
+                        for w in data[i]['btc']['below']:
+                            if str(data[i]['btc']['below'][w]) == str(response):
+                                status = True
+                                temp["btc"]["below"].pop(w)
 
-            if status == True:
-                db.update(temp, tabla.id == str(update.message.chat_id))
-                update.message.reply_text("Alert removed")          
+                if status == True:
+                    db.update(temp, tabla.id == str(update.message.chat_id))
+                    update.message.reply_text("Alert removed")          
 
-            if status == False:
+                if status == False:
+                    update.message.reply_text("Alert not found")
+
+            except:
                 update.message.reply_text("Alert not found")
-            
+
         else:
             update.message.reply_text("Please send me a number")
         
@@ -109,6 +113,8 @@ def addwhiltelist(update: Update, context: CallbackContext, response=None) -> No
             if response == pw:
                 update.message.reply_text("Password correct, you are now in the whitelist")
                 db.insert({"id":f"{update.message.chat_id}","btc":{"above":{},"below":{}}})
+            else:
+                update.message.reply_text("Password incorrect")
     statusPassword = False
 
 def password(update: Update, context: CallbackContext) -> None:
@@ -159,10 +165,8 @@ def above(update: Update, context: CallbackContext, response=None) -> None:
                 update.message.reply_text(f"The price is already higher than the value you set (Btc: {price})")
 
             else:
-                print(response)
                 tabla = Query()
                 key = getKey('above', update.message.chat_id,response) 
-                print(key)
                 if key == -1:
                     update.message.reply_text("The alert is already in the list")
 
@@ -195,12 +199,10 @@ def below(update: Update, context: CallbackContext, response=None) -> None:
                 update.message.reply_text(f"The price is already lower than the value you set (Btc: {price})")
 
             else:
-                print(response)
                 tabla = Query()
                 key = getKey('below', update.message.chat_id,response) 
                 if key == -1:
                     update.message.reply_text("The alert is already in the list")
-
                 if key != None:
                     key = key + 1
                 if key == None:
@@ -219,55 +221,61 @@ def below(update: Update, context: CallbackContext, response=None) -> None:
     statusBelow = False
 
 def active(update: Update, context: CallbackContext) -> None:
-    with open(f'{dbname}', 'r') as f:
-        try:
+
+    try:
+        indatabase = False  
+        empt = True
+        with open(f'{dbname}', 'r') as f:
             data = json.load(f)
             data = data["_default"]
-        except:
-            pass
 
-    for i in data:
-        i = str(i)
-        empt = True
-        if str(data[i]['id']) == str(update.message.chat_id):
-            activeAlerts = data[i]['btc']
-            text = "Active alerts: \n\nAbove of: \n"
+            for i in data:
+                i = str(i)
+                if str(data[i]['id']) == str(update.message.chat_id):
+                    indatabase = True
+                    text = "Active alerts: \n\nAbove of: \n"
 
-            if len(data[i]['btc']['above']) > 0 or len(data[i]['btc']['below']) > 0:
-                empt = False
+                    if len(data[i]['btc']['above']) > 0 or len(data[i]['btc']['below']) > 0:
+                        empt = False
 
-            if empt == False:
+                    if empt == False:
 
-                for x in data[i]['btc']['above']:
-                    text = text + f"{data[i]['btc']['above'][x]} \n"
-                        
-                text = text + "\nBelow of: \n"
-                for w in data[i]['btc']['below']:
-                    text = text + f"{data[i]['btc']['below'][w]} \n"
-                update.message.reply_text(text)
+                        for x in data[i]['btc']['above']:
+                            text = text + f"{data[i]['btc']['above'][x]} \n"
+                                
+                        text = text + "\nBelow of: \n"
+                        for w in data[i]['btc']['below']:
+                            text = text + f"{data[i]['btc']['below'][w]} \n"
+                        update.message.reply_text(text)
 
-            else:
-                update.message.reply_text("You don't have any active alerts")
- 
+                    else:
+                        update.message.reply_text("You don't have any active alerts")
+
+            if empt == True:
+                if indatabase == False:                    
+                    update.message.reply_text("You don't have any active alerts")
+    except:
+        if indatabase == False and empt == True:
+            update.message.reply_text("You don't have any active alerts")
+
 def getKey(type, id, text):
 
     with open(f'{dbname}', 'r') as f:
         try:
             data = json.load(f)
             data = data["_default"]
+        
+            for i in data:
+                i = str(i)
+                if str(data[i]['id']) == str(id):
+                    for x in data[i]['btc'][type]:
+                        x = str(x)
+                        if text == data[i]['btc'][type][x]:
+                            return -1
+                    return len(data[i]['btc'][type])
+
         except:
-            pass
-
-    for i in data:
-        i = str(i)
-        if str(data[i]['id']) == str(id):
-            for x in data[i]['btc'][type]:
-                x = str(x)
-                if text == data[i]['btc'][type][x]:
-                    return -1
-            return len(data[i]['btc'][type])
-
-    return None
+            return None
 
 def getPrice():
     url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
@@ -284,8 +292,8 @@ def checkWhitelist(id):
         try:
             data = json.load(f)
             data = data["_default"]
-        except:
-            pass
+        except:            
+            return False
 
     for i in data:
         i = str(i)
