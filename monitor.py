@@ -56,9 +56,10 @@ while True:
                 print(alert)
                 if price > alert:
                     Tbot.send_message(chat, f'Bitcoin price is above of {alert} the actual price is {price}')
-                    del original["_default"][i]['btc']["above"][d]
-                    with open(f'{dbname}', 'w') as f:
-                        json.dump(original, f, indent=4)
+                    if data[i]['status'] == "false":
+                        del original["_default"][i]['btc']["above"][d]
+                        with open(f'{dbname}', 'w') as f:
+                            json.dump(original, f, indent=4)
                     break
 
             for d in data[i]['btc']["below"]:
@@ -67,9 +68,10 @@ while True:
                 print(alert)
                 if price < alert:
                     Tbot.send_message(chat, f'Bitcoin price is below of {alert} the actual price is {price}')
-                    del original["_default"][i]['btc']["below"][d]
-                    with open(f'{dbname}', 'w') as f:
-                        json.dump(original, f, indent=4)
+                    if data[i]['status'] == "false":
+                        del original["_default"][i]['btc']["below"][d]
+                        with open(f'{dbname}', 'w') as f:
+                            json.dump(original, f, indent=4)
                     break
 
             time.sleep(1)

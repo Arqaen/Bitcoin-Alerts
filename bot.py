@@ -1,9 +1,11 @@
+# Libraries
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler, CallbackContext
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 import requests
 import json
 from tinydb import TinyDB, Query
 
+# Import config file
 with open('config.json', 'r') as f:
     try:
         config = json.load(f)
@@ -11,6 +13,7 @@ with open('config.json', 'r') as f:
         print("Error loading config.json")
         exit()
 
+# Get config data
 token = config['token']
 pw = config['password']
 dbname = config['db']
@@ -18,16 +21,20 @@ db = TinyDB(dbname)
 updater = Updater(token)
 dp = updater.dispatcher
 
-statusRemove = False
+# Variables
 statusPassword = False
+statusAlerts = False
+statusRemove = False
 statusAbove = False
 statusBelow = False
 
-def getId(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text(f"Your id is {update.message.chat_id}")
+# Listener
 
 def empty(update: Update, context: CallbackContext) -> None:
+
     print(update.message.text)
+    uid = update.message.chat_id
+
     if statusRemove == True:
         removeit(update, context, update.message.text)
 
@@ -39,7 +46,17 @@ def empty(update: Update, context: CallbackContext) -> None:
 
     if statusBelow == True:
         below(update, context, update.message.text)
-    
+
+    if statusAlerts == True:
+        stats(update, context, update.message.text, uid)
+
+# No input commands
+
+def getId(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text(f"Your id is {update.message.chat_id}")
+
+# Basic commands
+
 def stop(update: Update, context: CallbackContext) -> None:
     global statusRemove, statusPassword, statusAbove, statusBelow
     if statusRemove == True or statusPassword == True or statusAbove == True or statusBelow == True:
@@ -50,6 +67,53 @@ def stop(update: Update, context: CallbackContext) -> None:
         update.message.reply_text("Action stopped")
     else:
         update.message.reply_text("No action to stop")
+
+def start(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text("Hello, I'm a bot that will alert you when the price of bitcoin is higher or lower than the value you set. To start, type /help")
+    statusPassword = False
+
+def help(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text("The commands are: \n\n\n/help - To see the list of commands \n\n/start - Start the bot \n\n/price - Get the price of bitcoin\n\n/alert - Create a new alert\n\n/active - Check the active alerts\n\n/remove - Remove some alert\n\n/id - Get the id of the chat\n\n/status - Get the current status and change it")
+
+# Change status 
+
+def stats(update: Update, context: CallbackContext, response, uid) -> None:
+    global statusAlerts
+
+    if statusAlerts == True and response != None:
+
+        response = response.lower()
+        tabla = Query()
+        temp = db.get(tabla.id == str(uid))
+
+        if response == "y" or response == "yes":
+            temp["status"] = "false"
+            db.update(temp, tabla.id == str(uid))
+            update.message.reply_text("Alerts will be deleted once they are notified")
+
+        elif response == "n" or response == "no":
+            temp["status"] = "true"
+            db.update(temp, tabla.id == str(uid))
+            update.message.reply_text("Alerts will not be deleted once they are notified")
+
+        statusAlerts = False
+
+def status(update: Update, context: CallbackContext) -> None:
+
+    global statusAlerts
+    statusAlerts = True
+    tabla = Query()
+    temp = db.get(tabla.id == str(update.message.chat_id))
+    value = temp["status"]
+
+    if value == "true":
+        current = "Current status: Not deleting after notified."
+    if value == "false":
+        current = "Current status: Deleting after notified."
+
+    update.message.reply_text(f"Do you want to delete the alerts once they are notified? Y/n\n{current}")
+
+# Remove alerts
 
 def remove(update: Update, context: CallbackContext) -> None:
     global statusRemove
@@ -102,10 +166,8 @@ def removeit(update: Update, context: CallbackContext, response=None) -> None:
         
         statusRemove = False
     
-def btc(update: Update, context: CallbackContext) -> None:
-    price = getPrice()
-    update.message.reply_text(f"The price of bitcoin is {price}")
-    
+# Add to whitelist
+
 def addwhiltelist(update: Update, context: CallbackContext, response=None) -> None:
     global statusPassword
     if checkWhitelist(update.message.chat_id) == True:
@@ -114,7 +176,7 @@ def addwhiltelist(update: Update, context: CallbackContext, response=None) -> No
         if statusPassword == True and response != None:
             if response == pw:
                 update.message.reply_text("Password correct, you are now in the whitelist")
-                db.insert({"id":f"{update.message.chat_id}","btc":{"above":{},"below":{}}})
+                db.insert({"id":f"{update.message.chat_id}","status":"false","btc":{"above":{},"below":{}}})
             else:
                 update.message.reply_text("Password incorrect")
     statusPassword = False
@@ -124,12 +186,7 @@ def password(update: Update, context: CallbackContext) -> None:
     statusPassword = True
     update.message.reply_text("Please send me the password")
 
-def start(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text("Hello, I'm a bot that will alert you when the price of bitcoin is higher or lower than the value you set. To start, type /help")
-    statusPassword = False
-
-def help(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text("The commands are: \n\n\n/help - To see the list of commands \n\n/start - Start the bot \n\n/price - Get the price of bitcoin\n\n/alert - Create a new alert\n\n/active - Check the active alerts\n\n/remove - Remove some alert\n\n/id - Get the id of the chat")
+# Create alerts functions
 
 def alert(update: Update, context: CallbackContext) -> None:
 
@@ -260,6 +317,22 @@ def active(update: Update, context: CallbackContext) -> None:
         if indatabase == False and empt == True:
             update.message.reply_text("You don't have any active alerts")
 
+# Database functions
+
+def checkWhitelist(id):
+    with open(f'{dbname}', 'r') as f:
+        try:
+            data = json.load(f)
+            data = data["_default"]
+        except:            
+            return False
+
+    for i in data:
+        i = str(i)
+        if str(data[i]['id']) == str(id):
+            return True
+    return False
+
 def getKey(type, id, text):
 
     with open(f'{dbname}', 'r') as f:
@@ -279,6 +352,12 @@ def getKey(type, id, text):
         except:
             return None
 
+# Bitcoin functions
+
+def btc(update: Update, context: CallbackContext) -> None:
+    price = getPrice()
+    update.message.reply_text(f"The price of bitcoin is {price}")
+   
 def getPrice():
     url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
     try:
@@ -289,22 +368,10 @@ def getPrice():
     except:
         pass 
 
-def checkWhitelist(id):
-    with open(f'{dbname}', 'r') as f:
-        try:
-            data = json.load(f)
-            data = data["_default"]
-        except:            
-            return False
 
-    for i in data:
-        i = str(i)
-        if str(data[i]['id']) == str(id):
-            return True
-    return False
+if __name__ == '__main__':
 
-def main() -> None:
-
+    # General commands
     updater.dispatcher.add_handler(CommandHandler('start', start))
     updater.dispatcher.add_handler(CommandHandler('price', btc))
     updater.dispatcher.add_handler(CommandHandler('active', active))
@@ -312,17 +379,17 @@ def main() -> None:
     updater.dispatcher.add_handler(CommandHandler('stop', stop))
     updater.dispatcher.add_handler(CommandHandler('id', getId))
 
-    updater.dispatcher.add_handler(CommandHandler('alert', alert))
+    # Input commands
     updater.dispatcher.add_handler(CommandHandler('password', password))
     updater.dispatcher.add_handler(CommandHandler('remove', remove))
+    updater.dispatcher.add_handler(CommandHandler('status', status))
+    updater.dispatcher.add_handler(CommandHandler('alert', alert))
 
+    # Specific commands
     updater.dispatcher.add_handler(MessageHandler(Filters.text, empty))
     updater.dispatcher.add_handler(CallbackQueryHandler(button))
     updater.start_polling()
     updater.idle()
-
-if __name__ == '__main__':
-    main()
 
 
 
