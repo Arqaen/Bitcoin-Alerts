@@ -3,7 +3,7 @@ import requests
 import time
 import json
 
-
+# Get the price of Bitcoin
 def getPrice():
     url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
     try:
@@ -14,6 +14,7 @@ def getPrice():
     except:
         pass
 
+# Import config file
 try:  
     with open('config.json') as f:
         config = json.load(f)
@@ -21,11 +22,13 @@ except:
     print("Error loading config.json")
     exit()
 
+# Get config data
 token = config['token']
 dbname = config['db']
 sleep = config['sleep']
 Tbot = TBot(token)
 
+# Loop for monitoring the price of Bitcoin and send alerts to Telegram
 while True:
 
     price=getPrice() 
