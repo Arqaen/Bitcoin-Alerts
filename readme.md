@@ -1,8 +1,5 @@
 # Bitcoin Alerts 
 
-![bitcoin](https://www.fundacionaquae.org/wp-content/uploads/2017/02/Bitcoin.png.webp)
-![bitcoin](https://www.nationalgeographic.com.es/medio/2021/06/02/bitcoin-es-la-criptomoneda-mas-popular-y-la-que-acumula-un-mayor-valor_5ce045f6_1280x800.jpg)
-
 A bot of bitcoin alerts for telegram.
 The db.json will save the alerts of every user.
 The bot have a whitelist by default.
