@@ -73,7 +73,7 @@ def start(update: Update, context: CallbackContext) -> None:
     statusPassword = False
 
 def help(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text("The commands are: \n\n\n/help - To see the list of commands \n\n/start - Start the bot \n\n/price - Get the price of bitcoin\n\n/alert - Create a new alert\n\n/active - Check the active alerts\n\n/remove - Remove some alert\n\n/id - Get the id of the chat\n\n/status - Get the current status and change it")
+    update.message.reply_text("The commands are: \n\n\n/help - To see the list of commands \n\n/start - Start the bot \n\n/price - Get the price of bitcoin\n\n/alert - Create a new alert\n\n/active - Check the active alerts\n\n/remove - Remove some alert\n\n/id - Get the id of the chat\n\n/status - Get the current status and change it\n\n/stop - Stop the current action\n\n/rate - Get the current rate of the USD-EUR\n\n")
 
 # Change status 
 
@@ -261,11 +261,11 @@ def below(update: Update, context: CallbackContext, response=None) -> None:
                 tabla = Query()
                 key = getKey('below', update.message.chat_id,response) 
                 if key == -1:
-                    update.message.reply_text("The alert is already in the list")
-                if key != None:
-                    key = key + 1
+                    update.message.reply_text("The alert is already in the list")                
                 if key == None:
                     update.message.reply_text(f"You are not in the whitelist, please contact an admin")
+                if key != None:
+                    key = key + 1
 
                 if key:
 
@@ -347,17 +347,28 @@ def getKey(type, id, text):
                         x = str(x)
                         if text == data[i]['btc'][type][x]:
                             return -1
-                    return len(data[i]['btc'][type])
+                    
+                    key = len(data[i]['btc'][type])
+                    try:
+                        if data[i]['btc'][type][key]:
+                            return key
+                    except:
+                        return (key+1)
 
         except:
             return None
 
-# Bitcoin functions
+# Other functions
 
 def btc(update: Update, context: CallbackContext) -> None:
     price = getPrice()
     update.message.reply_text(f"The price of bitcoin is {price}")
-   
+
+def rate(update: Update, context: CallbackContext) -> None:
+    rate = getRate()
+    if rate:
+        update.message.reply_text(f"The rate is: 1 USD = {rate} EUR")
+
 def getPrice():
     url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
     try:
@@ -368,12 +379,23 @@ def getPrice():
     except:
         pass 
 
+def getRate():
+    url = "https://api.exchangerate.host/latest?base=USD&symbols=EUR"
+    response = requests.get(url)
+    if response.status_code != 200:
+        print(f"Error: status code {response.status_code}")
+        return None
+
+    data = response.json()
+    rate
+    return round(data["rates"]["EUR"],3)
 
 if __name__ == '__main__':
 
     # General commands
     updater.dispatcher.add_handler(CommandHandler('start', start))
     updater.dispatcher.add_handler(CommandHandler('price', btc))
+    updater.dispatcher.add_handler(CommandHandler('rate', rate))
     updater.dispatcher.add_handler(CommandHandler('active', active))
     updater.dispatcher.add_handler(CommandHandler('help', help))
     updater.dispatcher.add_handler(CommandHandler('stop', stop))
