@@ -17,6 +17,7 @@ with open('config.json', 'r') as f:
 token = config['token']
 pw = config['password']
 dbname = config['db']
+currency = config['currency']
 db = TinyDB(dbname)
 updater = Updater(token)
 dp = updater.dispatcher
@@ -73,7 +74,7 @@ def start(update: Update, context: CallbackContext) -> None:
     statusPassword = False
 
 def help(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text("The commands are: \n\n\n/help - To see the list of commands \n\n/start - Start the bot \n\n/price - Get the price of bitcoin\n\n/alert - Create a new alert\n\n/active - Check the active alerts\n\n/remove - Remove some alert\n\n/id - Get the id of the chat\n\n/status - Get the current status and change it\n\n/stop - Stop the current action\n\n/rate - Get the current rate of the USD-EUR\n\n")
+    update.message.reply_text("The commands are: \n\n\n/help - To see the list of commands \n\n/start - Start the bot \n\n/price - Get the price of bitcoin\n\n/alert - Create a new alert\n\n/active - Check the active alerts\n\n/remove - Remove some alert\n\n/id - Get the id of the chat\n\n/status - Get the current status and change it\n\n/stop - Stop the current action\n\n/rate - Get the current rate of the USD-EUR\n\n/btcEur - Get the price of bitcoin in EUR\n\n/btcUsd - Get the price of bitcoin in USD\n\n")
 
 # Change status 
 
@@ -219,7 +220,7 @@ def above(update: Update, context: CallbackContext, response=None) -> None:
 
         if response.isdigit():
 
-            price = getPrice()
+            price = getPrice(currency)
             if int(response) < price:
                 update.message.reply_text(f"The price is already higher than the value you set (Btc: {price})")
 
@@ -253,7 +254,7 @@ def below(update: Update, context: CallbackContext, response=None) -> None:
 
         if response.isdigit():
 
-            price = getPrice()
+            price = getPrice(currency)
             if int(response) > price:
                 update.message.reply_text(f"The price is already lower than the value you set (Btc: {price})")
 
@@ -360,17 +361,27 @@ def getKey(type, id, text):
 
 # Other functions
 
+def btcEur(update: Update, context: CallbackContext) -> None:
+    price = getPrice('EUR')
+    update.message.reply_text(f"The price of bitcoin is {price} EUR")
+
+def btcUsd(update: Update, context: CallbackContext) -> None:
+    price = getPrice('USDT')
+    update.message.reply_text(f"The price of bitcoin is {price} USD")
+
 def btc(update: Update, context: CallbackContext) -> None:
-    price = getPrice()
-    update.message.reply_text(f"The price of bitcoin is {price}")
+    price = []
+    for currency in ['EUR','USDT']:
+        price.append(getPrice(currency))
+    update.message.reply_text(f"The price of bitcoin is {price[0]} EUR and {price[1]} USD")
 
 def rate(update: Update, context: CallbackContext) -> None:
     rate = getRate()
     if rate:
         update.message.reply_text(f"The rate is: 1 USD = {rate} EUR")
 
-def getPrice():
-    url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+def getPrice(currency):
+    url = f"https://api.binance.com/api/v3/ticker/price?symbol=BTC{currency}"
     try:
         data = requests.get(url)
         data = data.json()
@@ -395,6 +406,8 @@ if __name__ == '__main__':
     # General commands
     updater.dispatcher.add_handler(CommandHandler('start', start))
     updater.dispatcher.add_handler(CommandHandler('price', btc))
+    updater.dispatcher.add_handler(CommandHandler('btcEur', btcEur))
+    updater.dispatcher.add_handler(CommandHandler('btcUsd', btcUsd))
     updater.dispatcher.add_handler(CommandHandler('rate', rate))
     updater.dispatcher.add_handler(CommandHandler('active', active))
     updater.dispatcher.add_handler(CommandHandler('help', help))

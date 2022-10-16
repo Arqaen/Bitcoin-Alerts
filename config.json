@@ -2,5 +2,6 @@
     "db": "db.json",
     "password": "password",
     "token": "token", 
+    "currency": "EUR",
     "sleep": 0
 }
