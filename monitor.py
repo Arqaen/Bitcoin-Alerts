@@ -1,90 +1,86 @@
-from telegram import Bot as TBot
+from telegram import Bot
 import requests
 import time
 import json
+import sqlite3
 
-# Import config file
-try:  
+# Load configuration
+try:
     with open('config.json') as f:
         config = json.load(f)
-except:
-    print("Error loading config.json")
+except Exception as e:
+    print("Error loading config.json:", e)
     exit()
 
-# Get config data
-token = config['token']
-dbname = config['db']
-sleep = config['sleep']
 currency = config['currency']
-Tbot = TBot(token)
+token = config['token']
+sleep_time = config['sleep']
+dbname = config['db']
 
-# Get the price of Bitcoin
+bot = Bot(token)
+db_conn = sqlite3.connect(dbname, check_same_thread=False)
+db_cursor = db_conn.cursor()
+
+# Helper functions for SQLite access
+def get_all_users():
+    db_cursor.execute("SELECT chat_id, deletion_status FROM users")
+    return db_cursor.fetchall()
+
+def get_user_alerts(chat_id):
+    db_cursor.execute("SELECT alert_id, type, value FROM alerts WHERE chat_id = ?", (str(chat_id),))
+    return db_cursor.fetchall()
+
+def delete_alert(alert_id):
+    db_cursor.execute("DELETE FROM alerts WHERE alert_id = ?", (alert_id,))
+    db_conn.commit()
+
 def getPrice():
+    """Get the price of BTC in your configured currency (e.g., USDT or EUR)."""
     url = f"https://api.binance.com/api/v3/ticker/price?symbol=BTC{currency}"
-    try:
-        data = requests.get(url)
-        data = data.json()
-        price = data['price']
-        return int(float(price))
-    except:
-        pass
+    response = requests.get(url)
+    if response.status_code != 200:
+        return None
+    data = response.json()
+    return int(float(data['price']))
 
-
-# Loop for monitoring the price of Bitcoin and send alerts to Telegram
 while True:
-
-    price=getPrice() 
-    if(price == None):
-        time.sleep(sleep)
-        continue
-        
-    print(f"\n\nBitcoin price:{price}")
-    print("----------------------\n")
-    try:
-        with open(f'{dbname}', 'r') as f:        
-            data = json.load(f)
-            original = data
-            data = data["_default"]
-    except:
-        print("Error loading data")
-        time.sleep(sleep)
+    price = getPrice()
+    if price is None:
+        print("Error fetching price. Retrying...")
+        time.sleep(sleep_time)
         continue
 
-    try:
-        for i in data:
-            chat = data[i]['id']
-            print(f"\nId: {chat}\n")
+    print(f"\nBitcoin price: {price} ({currency})\n")
 
-            for d in data[i]['btc']["above"]:
-                alert = data[i]['btc']["above"][d]
-                alert = int(alert)
-                print(alert)
-                if price > alert:
-                    Tbot.send_message(chat, f'Bitcoin price is above of {alert} the actual price is {price}')
-                    if data[i]['status'] == "false":
-                        del original["_default"][i]['btc']["above"][d]
-                        with open(f'{dbname}', 'w') as f:
-                            json.dump(original, f, indent=4)
-                    break
+    users = get_all_users()
 
-            for d in data[i]['btc']["below"]:
-                alert = data[i]['btc']["below"][d]
-                alert = int(alert)
-                print(alert)
-                if price < alert:
-                    Tbot.send_message(chat, f'Bitcoin price is below of {alert} the actual price is {price}')
-                    if data[i]['status'] == "false":
-                        del original["_default"][i]['btc']["below"][d]
-                        with open(f'{dbname}', 'w') as f:
-                            json.dump(original, f, indent=4)
-                    break
+    # Check each user's alerts
+    for user in users:
+        chat_id, deletion_status = user
 
-            time.sleep(1)
-    
-    except:
-        time.sleep(sleep)
-        continue    
+        alerts = get_user_alerts(chat_id)
+        triggered_alert_ids = []
 
-    time.sleep(sleep)
+        for alert_id, alert_type, alert_value in alerts:
+            # Compare as integers
+            if alert_type == "above" and price > alert_value:
+                bot.send_message(chat_id=int(chat_id),
+                                 text=f"🚀 Bitcoin price is above {alert_value} {currency}! Current price: {price}")
+                triggered_alert_ids.append(alert_id)
 
+            elif alert_type == "below" and price < alert_value:
+                bot.send_message(chat_id=int(chat_id),
+                                 text=f"🚀 Bitcoin price is below {alert_value} {currency}! Current price: {price}")
+                triggered_alert_ids.append(alert_id)
 
+        # If user status = "false", remove triggered alerts
+        # "false" means: delete alert after sending
+        if deletion_status == "false" and triggered_alert_ids:
+            for a_id in triggered_alert_ids:
+                delete_alert(a_id)
+
+        # Small delay to avoid flooding if many users
+        time.sleep(1)
+
+    # Sleep before next price check
+    time.sleep(sleep_time)

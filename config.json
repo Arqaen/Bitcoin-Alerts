@@ -1,7 +1,7 @@
 {
-    "db": "db.json",
+    "db": "users.db",
     "password": "password",
-    "token": "token", 
+    "token": "5777447107:AAFfcDlprzJovFoE58Srs2tavJyUHEfl3rM",
     "currency": "EUR",
-    "sleep": 0
+    "sleep": 1
 }
